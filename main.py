@@ -8,6 +8,8 @@ import requests
 from bs4 import BeautifulSoup
 from rich.console import Console
 from rich.table import Table
+from rich.progress import track
+import concurrent.futures
 
 subdomain_file_name = "subdomain_raw.txt"
 server_file_name = "Server.csv"
@@ -26,14 +28,14 @@ def check_host(subdomain):
     }
 
     try:
-        r = requests.get(f"https://{subdomain}", timeout=5)
+        r = requests.get(f"https://{subdomain}", timeout=3)
         soup = BeautifulSoup(r.text, "html.parser")
         if soup.title and soup.title.string:
             row['title'] = soup.title.string.strip()
 
         else:
             row['title'] = "N/A"
-            
+
         row['server'] = r.headers.get('Server', '')
         row['content_type'] = r.headers.get('Content-Type', '')
         row['final_url'] = r.url
@@ -45,23 +47,30 @@ def check_host(subdomain):
     
     return row
 
-with open(subdomain_file_name, 'r') as file:
-    subdomains = list(set(file.read().splitlines()))
-    
-    print("Requesting HTTPS")
-    results = [check_host(s) for s in subdomains]
-        
-with open(server_file_name, mode='w', newline='') as file:
-    w = csv.DictWriter(file, fieldnames=Fieldnames)
-    w.writeheader()
-    w.writerows(results)
 
 
-console = Console()
-table = Table(title="Subdomain Scanner")
-for f in Fieldnames:
-    table.add_column(f, style="blue")
-for r in results:
-    table.add_row(*[str(r[key]) for key in Fieldnames])
+if __name__ == '__main__':
+    with open(subdomain_file_name, 'r') as file:
+        subdomains = list(set(file.read().splitlines()))
+        with concurrent.futures.ThreadPoolExecutor(100) as executor:
+            futures = [executor.submit(check_host,s) for s in subdomains]
 
-console.print(table)
+            results = []
+
+            for future in track(concurrent.futures.as_completed(futures), description="Scanning Shi...", total=len(subdomains)):
+                results.append(future.result())
+            
+    with open(server_file_name, mode='w', newline='') as file:
+        w = csv.DictWriter(file, fieldnames=Fieldnames)
+        w.writeheader()
+        w.writerows(results)
+
+
+    console = Console()
+    table = Table(title="Subdomain Scanner")
+    for f in Fieldnames:
+        table.add_column(f, style="blue")
+    for r in results:
+        table.add_row(*[str(r[key]) for key in Fieldnames])
+
+    console.print(table)
