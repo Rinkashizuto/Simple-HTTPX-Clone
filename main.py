@@ -3,33 +3,53 @@
 # Use request to get the following subdomain, url, status_code, title, server, content_type, final_url
 # lastly display them fabulously.
 
+import csv
 import requests
 from bs4 import BeautifulSoup
 
 subdomain_file_name = "subdomain_raw.txt"
 server_file_name = "Server.csv"
 
+def check_host(subdomain):
+    row = {
+        "subdomain": subdomain,
+        "url": f"https://{subdomain}",
+        "status_code": "error",
+        "title": "",
+        "server": "",
+        "content_type": "",
+        "final_url": "",
+    }
+
+    try:
+        r = requests.get(f"https://{subdomain}", timeout=5)
+        soup = BeautifulSoup(r.text, "html.parser")
+        if soup.title and soup.title.string:
+            row['title'] = soup.title.string.strip()
+
+        else:
+            row['title'] = "N/A"
+        row['server'] = r.headers.get('Server', '')
+        row['content_type'] = r.headers.get('Content-Type', '')
+        row['final_url'] = r.url
+        row['status_code'] = r.status_code
+
+
+    except requests.exceptions.RequestException as e: 
+        pass
+    
+    return row
+
 with open(subdomain_file_name, 'r') as file:
-    content = file.read().splitlines()
-    print("Requesting HTTP")
-    for c in content:
-        try:
-            response = requests.get(f"https://{c}", timeout=5)
-            response.raise_for_status()
-            print("-----")
-            print(f"Requesting {c}")
-            print(f"subdomain : {c}")
-            print(f" URL : {response.url}")
-            soup = BeautifulSoup(response.text, "html.parser")
-            if soup.title:
-                print(f"title : {soup.title}")
-            print(f"server : {response.headers.get("Server")}")
-            print(f"content_type : {response.headers.get("Content-Type")}")
-            print("-----")
+    subdomains = list(set(file.read().splitlines()))
     
-        except requests.exceptions.RequestException as e:
-            print("Failed")
-            continue
-    
+    print("Requesting HTTPS")
+    results = [check_host(s) for s in subdomains]
+    for r in results:
+        print(r)
+
+
+
+
 
 
