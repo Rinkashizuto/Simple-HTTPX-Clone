@@ -10,6 +10,8 @@ from bs4 import BeautifulSoup
 subdomain_file_name = "subdomain_raw.txt"
 server_file_name = "Server.csv"
 
+Fieldnames = ["subdomain",'url','status_code','title','server','content_type','final_url']
+
 def check_host(subdomain):
     row = {
         "subdomain": subdomain,
@@ -45,9 +47,11 @@ with open(subdomain_file_name, 'r') as file:
     
     print("Requesting HTTPS")
     results = [check_host(s) for s in subdomains]
-    for r in results:
-        print(r)
-
+        
+with open(server_file_name, mode='w', newline='') as file:
+    w = csv.DictWriter(file, fieldnames=Fieldnames)
+    w.writeheader(Fieldnames)
+    w.writerow(results)
 
 
 
